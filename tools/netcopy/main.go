@@ -105,7 +105,7 @@ func main() {
 					tunnel := NewTunnel(*amplification, "tcp", *targetTcpServerAddress)
 					tunnels[srcAddr] = tunnel
 				} else if pkt.TCP.IsReset() || pkt.TCP.IsFin() {
-					fmt.Printf("==========> Got a RESET/FIN package, close the connection\n")
+					fmt.Printf("==========> Got a %s package, close the connection\n", pkt.TCP.FlagsString())
 					if t, ok := tunnels[srcAddr]; ok && t != nil {
 						t.Close()
 						delete(tunnels, srcAddr)

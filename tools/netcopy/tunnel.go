@@ -22,7 +22,7 @@ func NewTunnel(count int, protocol string, addr string) *Tunnel {
 	t := new(Tunnel)
 	t.dch = make(chan []byte, 5)
 	t.ach = make(chan int)
-	t.timeout = time.Duration(10) * time.Second
+	t.timeout = time.Duration(1) * time.Second
 
 	for c := 0; c < count; c++ {
 		conn, err := net.Dial("tcp", addr)
@@ -44,7 +44,12 @@ func (t *Tunnel) read(conn net.Conn) {
 	for {
 		conn.SetReadDeadline(time.Now().Add(t.timeout))
 		n, e := conn.Read(buf)
-		if n == 0 || e != nil {
+		if e != nil {
+			if neterr, ok := e.(net.Error); ok {
+				if n == 0 && neterr != nil && (neterr.Timeout() || neterr.Temporary()) {
+					continue
+				}
+			}
 			fmt.Printf("stop reading data. n=%d err=%v\n", n, e.Error())
 			break
 		}
