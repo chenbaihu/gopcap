@@ -16,20 +16,23 @@ type Tunnel struct {
 	dch     chan []byte // data channel to transfer receiving data
 	ach     chan int    // admin channel
 	timeout time.Duration
+	srcAddr string
 }
 
-func NewTunnel(count int, protocol string, addr string) *Tunnel {
+func NewTunnel(count int, protocol string, srcAddr string, targetServerAddr string) *Tunnel {
 	t := new(Tunnel)
 	t.dch = make(chan []byte, 5)
 	t.ach = make(chan int)
 	t.timeout = time.Duration(1) * time.Second
+	t.srcAddr = srcAddr
 
 	for c := 0; c < count; c++ {
-		conn, err := net.Dial("tcp", addr)
+		conn, err := net.Dial("tcp", targetServerAddr)
 		if err != nil {
-			fmt.Printf("[%s] connect to %s failed : %v\n", protocol, addr, err.Error())
+			fmt.Printf("[%s] connect to %s failed : %v\n", protocol, targetServerAddr, err.Error())
 			return nil
 		}
+		fmt.Printf("==========> Create Tunnel %v [%v -> %v]\n", t.srcAddr, conn.LocalAddr(), conn.RemoteAddr())
 		t.conn = append(t.conn, conn)
 
 		go t.read(conn)
@@ -50,7 +53,7 @@ func (t *Tunnel) read(conn net.Conn) {
 					continue
 				}
 			}
-			fmt.Printf("stop reading data. n=%d err=%v\n", n, e.Error())
+			fmt.Printf("stop reading data. srcAddr=%v n=%d err=%v\n", t.srcAddr, n, e.Error())
 			break
 		}
 	}
@@ -60,19 +63,19 @@ func (t *Tunnel) serve() {
 	for {
 		select {
 		case data := <-t.dch:
-			for _, c := range t.conn {
-				c.Write(data)
+			for _, conn := range t.conn {
+				conn.Write(data)
 			}
 		case closing := <-t.ach:
 			if closing == CloseTunnel {
-				for _, c := range t.conn {
-					c.Write([]byte(""))
-					c.Close()
+				for _, conn := range t.conn {
+					conn.Write([]byte(""))
+					fmt.Printf("==========> Close Tunnel %v [%v -> %v]\n", t.srcAddr, conn.LocalAddr(), conn.RemoteAddr())
+					conn.Close()
 				}
 			}
 			return
 		}
-
 	}
 }
 

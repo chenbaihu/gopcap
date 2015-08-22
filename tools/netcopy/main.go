@@ -102,7 +102,7 @@ func main() {
 			if pkt.IP.Protocol == IP_TCP {
 				if pkt.TCP.IsSyn() {
 					fmt.Printf("==========> Got a SYN package, connecting to %s\n", *targetTcpServerAddress)
-					tunnel := NewTunnel(*amplification, "tcp", *targetTcpServerAddress)
+					tunnel := NewTunnel(*amplification, "tcp", srcAddr, *targetTcpServerAddress)
 					tunnels[srcAddr] = tunnel
 				} else if pkt.TCP.IsReset() || pkt.TCP.IsFin() {
 					fmt.Printf("==========> Got a %s package, close the connection\n", pkt.TCP.FlagsString())
