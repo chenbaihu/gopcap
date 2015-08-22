@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	_ "net/http/pprof"
 	"os"
 	"strconv"
 
@@ -31,15 +32,15 @@ func main() {
 	var snaplen *int = flag.Int("s", 65535, "snaplen")
 	var hexdump *bool = flag.Bool("X", false, "hexdump")
 	var targetTcpServerAddress *string = flag.String("T", "", "The address of the target tcp server, for example: 192.168.0.99:80")
-	var amplification *int = flag.Int("a", 1, "The amplification count")
-	//var tcpTarget *string = flag.String("U", "", "The address of the target udp server, for exsample: 192.168.0.111:53")
+	var amplification *int = flag.Int("a", 1, "The amplification times")
+
 	expr := ""
 
 	out = bufio.NewWriter(os.Stdout)
 	errout = bufio.NewWriter(os.Stderr)
 
 	flag.Usage = func() {
-		fmt.Fprintf(errout, "usage: %s [ -i interface ] [ -s snaplen ] [ -X ] [ expression ]\n", os.Args[0])
+		fmt.Fprintf(errout, "usage: %s [ -i interface ] [ -s snaplen ] [ -T targethost:port ] [ -a amplification-times [ -X ] [ expression ]\n", os.Args[0])
 		errout.Flush()
 		os.Exit(1)
 	}
@@ -88,7 +89,7 @@ func main() {
 
 	fmt.Printf("tcpdump: begin to capture ... \n")
 
-	var tunnels map[string]*Tunnel
+	tunnels := make(map[string]*Tunnel)
 	for pkt := h.Next(); pkt != nil; pkt = h.Next() {
 		pkt.Decode()
 		fmt.Fprintf(out, "%s\n", pkt.String())
@@ -107,6 +108,7 @@ func main() {
 					fmt.Printf("==========> Got a RESET/FIN package, close the connection\n")
 					if t, ok := tunnels[srcAddr]; ok && t != nil {
 						t.Close()
+						delete(tunnels, srcAddr)
 					}
 					continue
 				}

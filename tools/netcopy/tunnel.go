@@ -13,8 +13,8 @@ const (
 type Tunnel struct {
 	conn []net.Conn
 
-	dch chan []byte // data channel to transfer receiving data
-	ach chan int    // admin channel
+	dch     chan []byte // data channel to transfer receiving data
+	ach     chan int    // admin channel
 	timeout time.Duration
 }
 
@@ -22,7 +22,7 @@ func NewTunnel(count int, protocol string, addr string) *Tunnel {
 	t := new(Tunnel)
 	t.dch = make(chan []byte, 5)
 	t.ach = make(chan int)
-	t.timeout = time.Duration(100) * time.Second
+	t.timeout = time.Duration(10) * time.Second
 
 	for c := 0; c < count; c++ {
 		conn, err := net.Dial("tcp", addr)
@@ -61,9 +61,11 @@ func (t *Tunnel) serve() {
 		case closing := <-t.ach:
 			if closing == CloseTunnel {
 				for _, c := range t.conn {
+					c.Write([]byte(""))
 					c.Close()
 				}
 			}
+			return
 		}
 
 	}
