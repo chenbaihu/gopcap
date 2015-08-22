@@ -4,8 +4,8 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"net"
 	"os"
+	"strconv"
 
 	"encoding/base64"
 	"github.com/akrennmair/gopcap"
@@ -31,6 +31,7 @@ func main() {
 	var snaplen *int = flag.Int("s", 65535, "snaplen")
 	var hexdump *bool = flag.Bool("X", false, "hexdump")
 	var targetTcpServerAddress *string = flag.String("T", "", "The address of the target tcp server, for example: 192.168.0.99:80")
+	var amplification *int = flag.Int("a", 1, "The amplification count")
 	//var tcpTarget *string = flag.String("U", "", "The address of the target udp server, for exsample: 192.168.0.111:53")
 	expr := ""
 
@@ -87,8 +88,7 @@ func main() {
 
 	fmt.Printf("tcpdump: begin to capture ... \n")
 
-	var conn net.Conn
-	buf := make([]byte, 65536)
+	var tunnels map[string]*Tunnel
 	for pkt := h.Next(); pkt != nil; pkt = h.Next() {
 		pkt.Decode()
 		fmt.Fprintf(out, "%s\n", pkt.String())
@@ -97,35 +97,25 @@ func main() {
 		}
 		out.Flush()
 		if pkt.Type == TYPE_IP || pkt.Type == TYPE_IP6 {
+			srcAddr := pkt.IP.SrcAddr() + ":" + strconv.Itoa(int(pkt.TCP.SrcPort))
 			if pkt.IP.Protocol == IP_TCP {
 				if pkt.TCP.IsSyn() {
 					fmt.Printf("==========> Got a SYN package, connecting to %s\n", *targetTcpServerAddress)
-					conn, err = net.Dial("tcp", *targetTcpServerAddress)
-					if err != nil {
-						fmt.Printf("connect to %s failed : %v\n", *targetTcpServerAddress, err.Error())
-						return
-					}
-					go func(conn net.Conn) {
-						for {
-							n, e := conn.Read(buf)
-							if n == 0 || e != nil {
-								fmt.Printf("stop reading data\n")
-								break
-							}
-							//discards the received data
-						}
-					}(conn)
+					tunnel := NewTunnel(*amplification, "tcp", *targetTcpServerAddress)
+					tunnels[srcAddr] = tunnel
 				} else if pkt.TCP.IsReset() || pkt.TCP.IsFin() {
 					fmt.Printf("==========> Got a RESET/FIN package, close the connection\n")
-					if conn != nil {
-						conn.Close()
+					if t, ok := tunnels[srcAddr]; ok && t != nil {
+						t.Close()
 					}
 					continue
 				}
 
-				if len(pkt.Payload) > 0 && conn != nil {
+				if len(pkt.Payload) > 0 {
 					fmt.Printf("==========> Got a data package, copy data to target server. len(payload)=%v\n", len(pkt.Payload))
-					conn.Write(pkt.Payload)
+					if t, ok := tunnels[srcAddr]; ok && t != nil {
+						t.Write(pkt.Payload)
+					}
 				}
 			} else if pkt.IP.Protocol == IP_UDP {
 
