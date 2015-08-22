@@ -100,7 +100,7 @@ func (p *Packet) headerString(headers []interface{}) string {
 		// Commonly the first header is an address.
 		if addr, ok := p.Headers[0].(addrHdr); ok {
 			if hdr, ok := p.Headers[1].(addrStringer); ok {
-				return fmt.Sprintf("%s %s", p.Time, hdr.String(addr))
+				return fmt.Sprintf("%s", hdr.String(addr))
 			}
 		}
 	}
@@ -309,7 +309,7 @@ func (p *Packet) decodeTcp() {
 }
 
 func (tcp *Tcphdr) String(hdr addrHdr) string {
-	return fmt.Sprintf("TCP %s:%d > %s:%d %s SEQ=%d ACK=%d LEN=%d",
+	return fmt.Sprintf("TCP %s:%d -> %s:%d %s SEQ=%d ACK=%d LEN=%d",
 		hdr.SrcAddr(), int(tcp.SrcPort), hdr.DestAddr(), int(tcp.DestPort),
 		tcp.FlagsString(), int64(tcp.Seq), int64(tcp.Ack), hdr.Len())
 }
@@ -317,33 +317,48 @@ func (tcp *Tcphdr) String(hdr addrHdr) string {
 func (tcp *Tcphdr) FlagsString() string {
 	var sflags []string
 	if 0 != (tcp.Flags & TCP_SYN) {
-		sflags = append(sflags, "syn")
+		sflags = append(sflags, "SYN")
 	}
 	if 0 != (tcp.Flags & TCP_FIN) {
-		sflags = append(sflags, "fin")
+		sflags = append(sflags, "FIN")
 	}
 	if 0 != (tcp.Flags & TCP_ACK) {
-		sflags = append(sflags, "ack")
+		sflags = append(sflags, "ACK")
 	}
 	if 0 != (tcp.Flags & TCP_PSH) {
-		sflags = append(sflags, "psh")
+		sflags = append(sflags, "PSH")
 	}
 	if 0 != (tcp.Flags & TCP_RST) {
-		sflags = append(sflags, "rst")
+		sflags = append(sflags, "RST")
 	}
 	if 0 != (tcp.Flags & TCP_URG) {
-		sflags = append(sflags, "urg")
+		sflags = append(sflags, "URG")
 	}
 	if 0 != (tcp.Flags & TCP_NS) {
-		sflags = append(sflags, "ns")
+		sflags = append(sflags, "NS")
 	}
 	if 0 != (tcp.Flags & TCP_CWR) {
-		sflags = append(sflags, "cwr")
+		sflags = append(sflags, "CWR")
 	}
 	if 0 != (tcp.Flags & TCP_ECE) {
-		sflags = append(sflags, "ece")
+		sflags = append(sflags, "ECE")
 	}
 	return fmt.Sprintf("[%s]", strings.Join(sflags, " "))
+}
+
+
+func (tcp *Tcphdr) IsSyn() bool {
+	if 0 != (tcp.Flags & TCP_RST) {
+		return true
+	}
+	return false
+}
+
+func (tcp *Tcphdr) IsReset() bool {
+	if 0 != (tcp.Flags & TCP_SYN) {
+		return true
+	}
+	return false
 }
 
 type Udphdr struct {
