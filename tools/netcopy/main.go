@@ -30,7 +30,7 @@ func main() {
 	var device *string = flag.String("i", "", "interface")
 	var snaplen *int = flag.Int("s", 65535, "snaplen")
 	var hexdump *bool = flag.Bool("X", false, "hexdump")
-	var targetTcpServerAddress *string = flag.String("T", "", "The address of the target tcp server, for example: 192.168.0.111:80")
+	var targetTcpServerAddress *string = flag.String("T", "", "The address of the target tcp server, for example: 192.168.0.99:80")
 	//var tcpTarget *string = flag.String("U", "", "The address of the target udp server, for exsample: 192.168.0.111:53")
 	expr := ""
 
