@@ -4,10 +4,9 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"os"
 	"net"
-	"log"
-	
+	"os"
+
 	"encoding/base64"
 	"github.com/akrennmair/gopcap"
 )
@@ -27,8 +26,7 @@ var out *bufio.Writer
 var errout *bufio.Writer
 
 func main() {
-	log.SetFlags(log.Lshortfile | log.Ldate | log.Ltime)
-	
+
 	var device *string = flag.String("i", "", "interface")
 	var snaplen *int = flag.Int("s", 65535, "snaplen")
 	var hexdump *bool = flag.Bool("X", false, "hexdump")
@@ -61,13 +59,13 @@ func main() {
 		}
 		*device = devs[0].Name
 		for _, d := range devs {
-			fmt.Printf("tcpdump: find device: [%s] [%s] [%s] %s\n", base64.StdEncoding.EncodeToString([]byte(d.Name)), d.Addresses[0].IP.String(), d.Name, d.Description)			
+			fmt.Printf("tcpdump: find device: [%s] [%s] [%s] %s\n", base64.StdEncoding.EncodeToString([]byte(d.Name)), d.Addresses[0].IP.String(), d.Name, d.Description)
 		}
 	}
-	
+
 	//*device = "\\Device\\NPF_{6605ECDE-64C1-4EC5-9620-1F9F3C2710E4}" // Cisco AnyConnect VPN Virtual Miniport Adapter for Windows x64
 	//*device = "\\Device\\NPF_{2C972895-AB1E-40A4-88C9-E22DC2099B70}" // home wireless wifi
-	
+
 	fmt.Printf("tcpdump: use devices: %s\n", *device)
 
 	h, err := pcap.Openlive(*device, int32(*snaplen), true, 0)
@@ -88,7 +86,7 @@ func main() {
 	fmt.Printf("tcpdump: SetFilter [%s]\n", expr)
 
 	fmt.Printf("tcpdump: begin to capture ... \n")
-	
+
 	var conn net.Conn
 	buf := make([]byte, 65536)
 	for pkt := h.Next(); pkt != nil; pkt = h.Next() {
@@ -108,23 +106,29 @@ func main() {
 						return
 					}
 					go func(conn net.Conn) {
-						for{
-							conn.Read(buf)
+						for {
+							n, e := conn.Read(buf)
+							if n == 0 || e != nil {
+								fmt.Printf("stop reading data\n")
+								break
+							}
 							//discards the received data
 						}
 					}(conn)
-				} else if pkt.TCP.IsReset() {
-					fmt.Printf("==========> Got a RESET package, close the connection\n")
-					conn.Close()
+				} else if pkt.TCP.IsReset() || pkt.TCP.IsFin() {
+					fmt.Printf("==========> Got a RESET/FIN package, close the connection\n")
+					if conn != nil {
+						conn.Close()
+					}
 					continue
 				}
-				
-				if len(pkt.Payload) > 0 {
+
+				if len(pkt.Payload) > 0 && conn != nil {
 					fmt.Printf("==========> Got a data package, copy data to target server. len(payload)=%v\n", len(pkt.Payload))
 					conn.Write(pkt.Payload)
 				}
 			} else if pkt.IP.Protocol == IP_UDP {
-				
+
 			}
 		}
 	}

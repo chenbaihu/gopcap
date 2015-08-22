@@ -389,16 +389,29 @@ func (tcp *Tcphdr) FlagsString() string {
 	return fmt.Sprintf("[%s]", strings.Join(sflags, " "))
 }
 
-
 func (tcp *Tcphdr) IsSyn() bool {
-	if 0 != (tcp.Flags & TCP_RST) {
+	if 0 != (tcp.Flags & TCP_SYN) {
+		return true
+	}
+	return false
+}
+
+func (tcp *Tcphdr) IsAck() bool {
+	if 0 != (tcp.Flags & TCP_ACK) {
 		return true
 	}
 	return false
 }
 
 func (tcp *Tcphdr) IsReset() bool {
-	if 0 != (tcp.Flags & TCP_SYN) {
+	if 0 != (tcp.Flags & TCP_RST) {
+		return true
+	}
+	return false
+}
+
+func (tcp *Tcphdr) IsFin() bool {
+	if 0 != (tcp.Flags & TCP_FIN) {
 		return true
 	}
 	return false
