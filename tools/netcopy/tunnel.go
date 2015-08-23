@@ -70,6 +70,7 @@ func (t *Tunnel) serve() {
 	for {
 		select {
 		case data := <-t.dch:
+			fmt.Printf("==========> Got a data package, writing data to target server. len(payload)=%v\n", len(data))
 			for _, conn := range t.conn {
 				conn.Write(data)
 			}
@@ -80,6 +81,13 @@ func (t *Tunnel) serve() {
 					fmt.Printf("==========> Close Tunnel %v [%v -> %v]\n", t.srcAddr, conn.LocalAddr(), conn.RemoteAddr())
 					conn.Close()
 				}
+			}
+			return
+		case <-time.After(t.timeout):
+			for _, conn := range t.conn {
+				conn.Write([]byte(""))
+				fmt.Printf("==========> Close Tunnel %v [%v -> %v]\n", t.srcAddr, conn.LocalAddr(), conn.RemoteAddr())
+				conn.Close()
 			}
 			return
 		}
