@@ -27,10 +27,9 @@ var out *bufio.Writer
 var errout *bufio.Writer
 
 func main() {
-
+	
 	var device *string = flag.String("i", "", "interface")
 	var snaplen *int = flag.Int("s", 65535, "snaplen")
-	var hexdump *bool = flag.Bool("X", false, "hexdump")
 	var targetTcpServerAddress *string = flag.String("T", "", "The address of the target tcp server, for example: 192.168.0.99:80")
 	var amplification *int = flag.Int("a", 1, "The amplification times")
 
@@ -89,20 +88,31 @@ func main() {
 
 	fmt.Printf("tcpdump: begin to capture ... \n")
 
-	tunnels := make(map[string]*Tunnel)
+	ch := make(chan *pcap.Packet, 100)
+	go decode(h, ch, *targetTcpServerAddress, *amplification)
 	for pkt := h.Next(); pkt != nil; pkt = h.Next() {
+		ch <- pkt
+	}
+	
+	ch <- nil
+}
+
+func decode(h *pcap.Pcap, ch chan *pcap.Packet, targetTcpServerAddress string, amplification int) {
+	tunnels := make(map[string]*Tunnel)
+	for {
+		pkt := <-ch
+		if pkt == nil {
+			break
+		}
 		pkt.Decode()
 		fmt.Fprintf(out, "%s\n", pkt.String())
-		if *hexdump {
-			Hexdump(pkt)
-		}
 		//out.Flush()
 		if pkt.Type == TYPE_IP || pkt.Type == TYPE_IP6 {
 			srcAddr := pkt.IP.SrcAddr() + ":" + strconv.Itoa(int(pkt.TCP.SrcPort))
 			if pkt.IP.Protocol == IP_TCP {
 				if pkt.TCP.IsSyn() {
-					fmt.Printf("==========> Got a SYN package from %v, connecting to %s\n", srcAddr, *targetTcpServerAddress)
-					tunnel := NewTunnel(*amplification, "tcp", srcAddr, *targetTcpServerAddress)
+					fmt.Printf("==========> Got a SYN package from %v, connecting to %s\n", srcAddr, targetTcpServerAddress)
+					tunnel := NewTunnel(amplification, "tcp", srcAddr, targetTcpServerAddress)
 					tunnels[srcAddr] = tunnel
 				} else if pkt.TCP.IsReset() || pkt.TCP.IsFin() {
 					fmt.Printf("==========> Got a %s package from %v, close the connection\n", pkt.TCP.FlagsString(), srcAddr)
@@ -124,43 +134,7 @@ func main() {
 			}
 		}
 	}
+	
+	//TODO close tunnels
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func Hexdump(pkt *pcap.Packet) {
-	for i := 0; i < len(pkt.Data); i += 16 {
-		Dumpline(uint32(i), pkt.Data[i:min(i+16, len(pkt.Data))])
-	}
-}
-
-func Dumpline(addr uint32, line []byte) {
-	fmt.Fprintf(out, "\t0x%04x: ", int32(addr))
-	var i uint16
-	for i = 0; i < 16 && i < uint16(len(line)); i++ {
-		if i%2 == 0 {
-			out.WriteString(" ")
-		}
-		fmt.Fprintf(out, "%02x", line[i])
-	}
-	for j := i; j <= 16; j++ {
-		if j%2 == 0 {
-			out.WriteString(" ")
-		}
-		out.WriteString("  ")
-	}
-	out.WriteString("  ")
-	for i = 0; i < 16 && i < uint16(len(line)); i++ {
-		if line[i] >= 32 && line[i] <= 126 {
-			fmt.Fprintf(out, "%c", line[i])
-		} else {
-			out.WriteString(".")
-		}
-	}
-	out.WriteString("\n")
-}

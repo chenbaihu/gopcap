@@ -24,8 +24,8 @@ type Tunnel struct {
 
 func NewTunnel(amplification int, protocol string, srcAddr string, targetServerAddr string) *Tunnel {
 	t := new(Tunnel)
-	t.dch = make(chan []byte, 5)
-	t.ach = make(chan int)
+	t.dch = make(chan []byte, 10)
+	t.ach = make(chan int, 1)
 	t.timeout = time.Duration(1) * time.Second
 	t.srcAddr = srcAddr
 	t.targetAddr = targetServerAddr
