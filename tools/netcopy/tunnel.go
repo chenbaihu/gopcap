@@ -13,32 +13,26 @@ const (
 type Tunnel struct {
 	conn []net.Conn
 
-	dch     chan []byte // data channel to transfer receiving data
-	ach     chan int    // admin channel
-	timeout time.Duration
-	srcAddr string
+	dch           chan []byte // data channel to transfer receiving data
+	ach           chan int    // admin channel
+	timeout       time.Duration
+	srcAddr       string
+	targetAddr    string
+	protocol      string
+	amplification int
 }
 
-func NewTunnel(count int, protocol string, srcAddr string, targetServerAddr string) *Tunnel {
+func NewTunnel(amplification int, protocol string, srcAddr string, targetServerAddr string) *Tunnel {
 	t := new(Tunnel)
 	t.dch = make(chan []byte, 5)
 	t.ach = make(chan int)
 	t.timeout = time.Duration(1) * time.Second
 	t.srcAddr = srcAddr
+	t.targetAddr = targetServerAddr
+	t.protocol = protocol
+	t.amplification = amplification
 
-	for c := 0; c < count; c++ {
-		conn, err := net.Dial("tcp", targetServerAddr)
-		if err != nil {
-			fmt.Printf("[%s] connect to %s failed : %v\n", protocol, targetServerAddr, err.Error())
-			return nil
-		}
-		fmt.Printf("==========> Create Tunnel %v [%v -> %v]\n", t.srcAddr, conn.LocalAddr(), conn.RemoteAddr())
-		t.conn = append(t.conn, conn)
-
-		go t.read(conn)
-		go t.serve()
-	}
-
+	go t.serve()
 	return t
 }
 
@@ -60,6 +54,19 @@ func (t *Tunnel) read(conn net.Conn) {
 }
 
 func (t *Tunnel) serve() {
+
+	for c := 0; c < t.amplification; c++ {
+		conn, err := net.Dial(t.protocol, t.targetAddr)
+		if err != nil {
+			fmt.Printf("[%s] connect to %s failed : %v\n", t.protocol, t.targetAddr, err.Error())
+			return
+		}
+		fmt.Printf("==========> Create Tunnel %v [%v -> %v]\n", t.srcAddr, conn.LocalAddr(), conn.RemoteAddr())
+		t.conn = append(t.conn, conn)
+
+		go t.read(conn)
+	}
+
 	for {
 		select {
 		case data := <-t.dch:

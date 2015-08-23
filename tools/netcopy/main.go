@@ -96,16 +96,16 @@ func main() {
 		if *hexdump {
 			Hexdump(pkt)
 		}
-		out.Flush()
+		//out.Flush()
 		if pkt.Type == TYPE_IP || pkt.Type == TYPE_IP6 {
 			srcAddr := pkt.IP.SrcAddr() + ":" + strconv.Itoa(int(pkt.TCP.SrcPort))
 			if pkt.IP.Protocol == IP_TCP {
 				if pkt.TCP.IsSyn() {
-					fmt.Printf("==========> Got a SYN package, connecting to %s\n", *targetTcpServerAddress)
+					fmt.Printf("==========> Got a SYN package from %v, connecting to %s\n", srcAddr, *targetTcpServerAddress)
 					tunnel := NewTunnel(*amplification, "tcp", srcAddr, *targetTcpServerAddress)
 					tunnels[srcAddr] = tunnel
 				} else if pkt.TCP.IsReset() || pkt.TCP.IsFin() {
-					fmt.Printf("==========> Got a %s package, close the connection\n", pkt.TCP.FlagsString())
+					fmt.Printf("==========> Got a %s package from %v, close the connection\n", pkt.TCP.FlagsString(), srcAddr)
 					if t, ok := tunnels[srcAddr]; ok && t != nil {
 						t.Close()
 						delete(tunnels, srcAddr)
@@ -114,7 +114,7 @@ func main() {
 				}
 
 				if len(pkt.Payload) > 0 {
-					fmt.Printf("==========> Got a data package, copy data to target server. len(payload)=%v\n", len(pkt.Payload))
+					fmt.Printf("==========> Got a data package from %v, copy data to target server. len(payload)=%v\n", srcAddr, len(pkt.Payload))
 					if t, ok := tunnels[srcAddr]; ok && t != nil {
 						t.Write(pkt.Payload)
 					}
